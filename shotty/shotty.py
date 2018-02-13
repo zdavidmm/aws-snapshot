@@ -1,5 +1,6 @@
 import boto3
 import click
+import botocore
 
 session = boto3.Session(profile_name='shotty')
 ec2 = session.resource('ec2')
@@ -16,6 +17,9 @@ def filter_instances(project):
 
     return instances
 
+def has_pending_snapshot(volume):
+    snapshots = list(volume.snapshots.all())
+    return snapshots and snapshots[0].state == 'pending'
 
 @click.group()
 def cli():
@@ -75,9 +79,9 @@ def list_volumes(project):
 
     return
 
-@cli.group()
+@cli.group('instances')
 def instances():
-    """Comands for instances"""
+    """Commands for instances"""
 
 @instances.command('snapshot',
   help="Create snapshots of all volumes")
@@ -138,7 +142,11 @@ def stop_instances(project):
 
     for i in filter_instances(project):
         print("stopping {0}...".format(i.id))
-        i.stop()
+        try:
+            i.stop()
+        except botocore.exceptions.ClientError as e:
+            print(" Could not stop {0}. ".format(i.id) + str(e))
+            continue
 
     return
 
@@ -150,7 +158,11 @@ def start_instances(project):
 
     for i in filter_instances(project):
         print("starting {0}...".format(i.id))
-        i.start()
+        try:
+            i.start()
+        except botocore.exceptions.ClientError as e:
+            print(" Could not start {0}. ".format(i.id) + str(e))
+            continue
 
     return
 
